@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vava56k</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/h264-mp4-encoder/embuild/dist/h264-mp4-encoder.web.js"></script>
+</head>
+<body style="background:#000; color:#fff; margin:0; padding:0; overflow:hidden;">
+
+    <div id="initOverlay" style="position:fixed; inset:0; z-index:100; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;">
+        <p id="initText">Initializing... 1%</p>
+        <div style="width:60vw; max-width:320px; height:8px; background:#333; border-radius:4px; overflow:hidden;">
+            <div id="initProgressBar" style="width:1%; height:100%; background:#e11d48;"></div>
+        </div>
+    </div>
+
+    <div style="position:absolute; top:20px; left:50%; transform:translateX(-50%); z-index:50; text-align:center; width:80vw;">
+        <h1>vava56k</h1>
+        <button id="recordBtn">Record</button>
+        <p id="status" style="display:none;">Processing video pipeline...</p>
+        <div id="progressWrap" style="display:none; width:100%; height:8px; background:#333; border-radius:4px; margin-top:10px; overflow:hidden;">
+            <div id="progressBar" style="width:0%; height:100%; background:#e11d48;"></div>
+        </div>
+    </div>
+
+    <video id="webcam" style="display:none;" autoplay playsinline muted></video>
+
+    <div id="canvas-container" style="width:100vw; height:100vh;"></div>
+
+    <script>
+        const str_01 = 'webcam';
+        const str_02 = 'canvas-container';
+        const str_03 = 'recordBtn';
+        const str_04 = 'status';
+        const str_05 = 'progressWrap';
+        const str_06 = 'progressBar';
+        const str_07 = 'initOverlay';
+        const str_08 = 'initText';
+        const str_09 = 'initProgressBar';
+        const str_10 = 'none';
+        const str_11 = 'Activity: initialize';
+        const str_12 = '%';
+        const str_13 = 'hmm.glb';
+        const str_14 = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/';
+        const str_15 = 'ERROR: h264-mp4-encoder.web.js library is missing!';
+        const str_16 = 'Encoder library not found. Make sure h264-mp4-encoder.web.js is loaded.';
+        const str_17 = 'Activity: recordstate';
+        const str_18 = 'block';
+        const str_19 = 'Activity: Convert frames to video';
+        const str_20 = '2d';
+        const str_21 = 'Stop';
+        const str_22 = '#444';
+        const str_23 = 'Failed to handle video pipeline: ';
+        const str_24 = 'Record';
+        const str_25 = '';
+        const str_26 = 'Activity: add duration';
+        const str_27 = 'video/mp4';
+        const str_28 = 'MP4 export successful: ';
+        const str_29 = ' bytes';
+        const str_30 = 'filter-capture-';
+        const str_31 = '.mp4';
+        const str_32 = 'Error writing MP4 file.';
+        const str_33 = 'a';
+        const str_34 = 'click';
+        const str_35 = 'resize';
+        const str_36 = 'video/webm;codecs=vp9';
+        const str_37 = 'video/webm;codecs=vp8';
+        const str_38 = 'video/webm';
+        const str_39 = 'dataavailable';
+        const str_40 = 'stop';
+        const str_41 = 'video';
+        const str_42 = 'loadedmetadata';
+        const str_43 = 'seeked';
+
+        const a = document.getElementById(str_01);
+        const b = document.getElementById(str_02);
+        const c = document.getElementById(str_03);
+        const d = document.getElementById(str_04);
+        const e = document.getElementById(str_05);
+        const f = document.getElementById(str_06);
+        const g = document.getElementById(str_07);
+        const h = document.getElementById(str_08);
+        const i = document.getElementById(str_09);
+
+        let j = null;
+        let k = null;
+        let l = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        let m = null;
+        let n = false;
+        let o = [];
+        let p = null;
+        let q = null;
+        let r = true;
+        let s = null;
+        let t = null;
+        let u = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+        let v = new THREE.Scene();
+        let w = null;
+        let x = false;
+
+        const y = 30;
+        const z = 1000 / y;
+
+        function z_initProgress(aa) {
+            const ab = Math.min(100, Math.max(1, Math.round(aa)));
+            i.style.width = ab + str_12;
+            h.textContent = str_11 + ab + str_12;
+            if (ab >= 100) {
+                setTimeout(() => { g.style.display = str_10; }, 300);
+            }
+        }
+
+        function z_log(ac) {
+            console.log(`[${new Date().toISOString().substr(11, 8)}] ${ac}`);
+        }
+
+        function z_setupScene() {
+            v.background = new THREE.Color(0x000000); 
+            l.position.z = 5;
+
+            u.setSize(window.innerWidth, window.innerHeight);
+            u.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            u.shadowMap.enabled = true;
+            b.appendChild(u.domElement);
+
+            const ad = new THREE.AmbientLight(0xffffff, 0.6);
+            v.add(ad);
+
+            const ae = new THREE.DirectionalLight(0xffffff, 0.8);
+            ae.position.set(0, 5, 5);
+            v.add(ae);
+
+            const af = new THREE.GLTFLoader();
+            af.load(str_13, (ag) => {
+                w = ag.scene;
+                w.scale.set(0.5, 0.5, 0.5); 
+                v.add(w);
+                z_initProgress(40);
+            }, (ah) => {
+                if (ah.lengthComputable) {
+                    z_initProgress(1 + (ah.loaded / ah.total) * 39);
+                }
+            }, (ai) => {
+                console.error(ai);
+                z_initProgress(40);
+            });
+
+            window.addEventListener(str_35, z_resize);
+        }
+
+        function z_resize() {
+            l.aspect = window.innerWidth / window.innerHeight;
+            l.updateProjectionMatrix();
+            u.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function z_renderLoop() {
+            requestAnimationFrame(z_renderLoop);
+            u.render(v, l);
+        }
+
+        function z_setupFaceMesh() {
+            m = new FaceMesh({
+                locateFile: (aj) => str_14 + aj
+            });
+
+            m.setOptions({
+                maxNumFaces: 1,
+                refineLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+
+            z_initProgress(60);
+            m.onResults(z_onFaceResults);
+
+            const ak = new Camera(a, {
+                onFrame: async () => {
+                    await m.send({ image: a });
+                },
+                width: 640,
+                height: 480
+            });
+            ak.start();
+            z_initProgress(80);
+        }
+
+        function z_onFaceResults(al) {
+            if (!w) return;
+
+            if (!x) {
+                x = true;
+                z_initProgress(100);
+            }
+
+            if (al.multiFaceLandmarks && al.multiFaceLandmarks.length > 0) {
+                const am = al.multiFaceLandmarks[0];
+
+                const an = am[1];
+                const ao = am[10];
+                const ap = am[152];
+                const aq = am[33];
+                const ar = am[263];
+                const as = am[234];
+                const at = am[454];
+
+                const au = window.innerWidth / window.innerHeight;
+                const av = -(an.x - 0.5) * 4.5 * au;
+                const aw = -(an.y - 0.5) * 4.5;
+
+                const ax = Math.hypot(at.x - as.x, at.y - as.y);
+                if (k === null) k = ax;
+                const ay = (ax - k) * 14;
+
+                w.position.x = THREE.MathUtils.lerp(w.position.x, av, 0.3);
+                w.position.y = THREE.MathUtils.lerp(w.position.y, aw, 0.3);
+                w.position.z = THREE.MathUtils.lerp(w.position.z, ay, 0.3);
+
+                const az = (ba) => new THREE.Vector3(ba.x, -ba.y, -ba.z);
+                const bb = az(aq);
+                const bc = az(ar);
+                const bd = az(ao);
+                const be = az(ap);
+
+                const bf = new THREE.Vector3().subVectors(bc, bb).normalize();
+                const bg = new THREE.Vector3().subVectors(be, bd).normalize();
+                const bh = new THREE.Vector3().crossVectors(bf, bg).normalize();
+                const bi = new THREE.Vector3().crossVectors(bh, bf).normalize();
+
+                const bj = new THREE.Matrix4().makeBasis(bf, bi, bh);
+                const bk = new THREE.Quaternion().setFromRotationMatrix(bj);
+
+                if (r) {
+                    j = bk.clone().invert();
+                    k = ax;
+                    r = false;
+                }
+
+                const bl = bk.clone().premultiply(j);
+                w.quaternion.slerp(bl, 0.3);
+
+                w.visible = true;
+            } else {
+                w.visible = false;
+            }
+        }
+
+        function z_startRecording() {
+            z_log(str_17);
+            d.style.display = str_18;
+            d.textContent = str_17;
+
+            o = [];
+            const bm = u.domElement.captureStream(y);
+            
+            let bn = str_36;
+            if (!MediaRecorder.isTypeSupported(bn)) {
+                bn = str_37;
+                if (!MediaRecorder.isTypeSupported(bn)) {
+                    bn = str_38;
+                }
+            }
+
+            p = new MediaRecorder(bm, { mimeType: bn });
+            p.ondataavailable = (bo) => {
+                if (bo.data && bo.data.size > 0) o.push(bo.data);
+            };
+
+            p.onstop = () => {
+                const bp = new Blob(o, { type: bn });
+                z_transcodeWebMToMP4(bp);
+            };
+
+            p.start();
+            n = true;
+            c.innerText = str_21;
+            c.style.background = str_22;
+        }
+
+        function z_stopRecording() {
+            n = false;
+            c.innerText = str_24;
+            c.style.background = str_25;
+            if (p) p.stop();
+        }
+
+        async function z_transcodeWebMToMP4(bq) {
+            if (typeof HME === 'undefined') {
+                z_log(str_15);
+                alert(str_16);
+                return;
+            }
+
+            d.textContent = str_19;
+            e.style.display = str_18;
+            f.style.width = str_25;
+
+            const br = 480;
+            const bs = Math.floor(br * (u.domElement.height / u.domElement.width));
+            const bt = br - (br % 2);
+            const bu = bs - (bs % 2);
+
+            try {
+                q = await HME.createH264MP4Encoder();
+                q.width = bt;
+                q.height = bu;
+                q.frameRate = y;
+                q.initialize();
+
+                s = document.createElement('canvas');
+                s.width = bt;
+                s.height = bu;
+                t = s.getContext(str_20);
+
+                const bv = document.createElement(str_41);
+                bv.src = URL.createObjectURL(bq);
+                bv.muted = true;
+                bv.playsInline = true;
+
+                bv.addEventListener(str_42, async () => {
+                    const bw = bv.duration;
+                    const bx = Math.ceil(bw * y);
+                    let by = 0;
+
+                    async function bz() {
+                        if (by >= bx) {
+                            z_finishMP4Export();
+                            return;
+                        }
+
+                        const ca = by / y;
+                        bv.currentTime = ca;
+                        
+                        await new Promise((cb) => {
+                            const cc = () => {
+                                bv.removeEventListener(str_43, cc);
+                                cb();
+                            };
+                            bv.addEventListener(str_43, cc);
+                        });
+
+                        t.drawImage(bv, 0, 0, bt, bu);
+                        const cd = t.getImageData(0, 0, bt, bu);
+                        q.addFrameRgba(cd.data);
+
+                        by++;
+                        f.style.width = ((by / bx) * 100) + str_12;
+                        requestAnimationFrame(bz);
+                    }
+
+                    bv.play();
+                    requestAnimationFrame(bz);
+                });
+
+            } catch (ce) {
+                z_log(str_23 + ce.message);
+                d.textContent = str_23;
+            }
+        }
+
+        function z_finishMP4Export() {
+            d.textContent = str_26;
+            setTimeout(() => {
+                try {
+                    q.finalize();
+                    const cf = q.FS.readFile(q.outputFilename);
+                    const cg = new Blob([cf], { type: str_27 });
+                    
+                    z_log(str_28 + cg.size + str_29);
+                    z_downloadBlob(cg, str_30 + Date.now() + str_31);
+                } catch (ch) {
+                    z_log(str_32 + ch.message);
+                    d.textContent = str_32;
+                } finally {
+                    q.delete();
+                    q = null;
+                    d.style.display = str_10;
+                    e.style.display = str_10;
+                }
+            }, 150);
+        }
+
+        function z_downloadBlob(ci, cj) {
+            const ck = URL.createObjectURL(ci);
+            const cl = document.createElement(str_33);
+            cl.href = ck;
+            cl.download = cj;
+            document.body.appendChild(cl);
+            cl.click();
+            cl.remove();
+            setTimeout(() => URL.revokeObjectURL(vk), 5000);
+        }
+
+        c.addEventListener(str_34, () => {
+            if (!n) {
+                z_startRecording();
+            } else {
+                z_stopRecording();
+            }
+        });
+
+        z_setupScene();
+        requestAnimationFrame(z_renderLoop);
+        z_setupFaceMesh();
+
+    </script>
+</body>
+</html>
